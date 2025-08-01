@@ -27,8 +27,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "script-src-attr": ["'unsafe-inline'"]
+      "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      "script-src-attr": ["'unsafe-inline'"],
+      "style-src": ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"]
     }
   }
 }));
@@ -38,9 +39,26 @@ app.use(express.urlencoded({ extended: true }));
 // Define base path for reverse proxy
 const BASE_PATH = process.env.BASE_PATH || '/communication-assistant';
 
-// Static files with base path
-app.use(BASE_PATH, express.static(path.join(__dirname, '../public')));
-app.use(`${BASE_PATH}/node_modules`, express.static(path.join(__dirname, '../node_modules')));
+// Static files with base path - set proper MIME types
+app.use(BASE_PATH, express.static(path.join(__dirname, '../public'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
+
+app.use(`${BASE_PATH}/node_modules`, express.static(path.join(__dirname, '../node_modules'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 connectDB();
 
@@ -59,6 +77,26 @@ app.get('/health', (req, res) => {
 
 app.get(`${BASE_PATH}/health`, (req, res) => {
   res.json({ status: 'OK', service: 'Internal Communications Assistant' });
+});
+
+// Handle favicon requests
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
+app.get(`${BASE_PATH}/favicon.ico`, (req, res) => {
+  res.status(204).end();
+});
+
+// Catch-all handler for debugging - should be last
+app.get('*', (req, res) => {
+  console.log(`Unhandled route: ${req.method} ${req.path}`);
+  if (req.path.startsWith('/communication-assistant') && !req.path.startsWith('/communication-assistant/api')) {
+    // Serve index.html for SPA routes
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+  } else {
+    res.status(404).json({ error: 'Route not found' });
+  }
 });
 
 app.use(errorHandler);
