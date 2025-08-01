@@ -35,19 +35,29 @@ app.use(helmet({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '../public')));
-app.use('/node_modules', express.static(path.join(__dirname, '../node_modules')));
+// Define base path for reverse proxy
+const BASE_PATH = process.env.BASE_PATH || '/communication-assistant';
+
+// Static files with base path
+app.use(BASE_PATH, express.static(path.join(__dirname, '../public')));
+app.use(`${BASE_PATH}/node_modules`, express.static(path.join(__dirname, '../node_modules')));
 
 connectDB();
 
-app.use('/api/auth', authRoutes);
-app.use('/api/messages', authMiddleware, messageRoutes);
-app.use('/api/templates', authMiddleware, templateRoutes);
-app.use('/api/integrations', authMiddleware, integrationRoutes);
-app.use('/api/guidelines', authMiddleware, guidelinesRoutes);
-app.use('/demo', demoRoutes);
+// API routes with base path
+app.use(`${BASE_PATH}/api/auth`, authRoutes);
+app.use(`${BASE_PATH}/api/messages`, authMiddleware, messageRoutes);
+app.use(`${BASE_PATH}/api/templates`, authMiddleware, templateRoutes);
+app.use(`${BASE_PATH}/api/integrations`, authMiddleware, integrationRoutes);
+app.use(`${BASE_PATH}/api/guidelines`, authMiddleware, guidelinesRoutes);
+app.use(`${BASE_PATH}/demo`, demoRoutes);
 
+// Health check endpoint (both with and without base path for flexibility)
 app.get('/health', (req, res) => {
+  res.json({ status: 'OK', service: 'Internal Communications Assistant' });
+});
+
+app.get(`${BASE_PATH}/health`, (req, res) => {
   res.json({ status: 'OK', service: 'Internal Communications Assistant' });
 });
 

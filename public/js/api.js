@@ -1,6 +1,10 @@
 class ApiClient {
   constructor() {
-    this.baseURL = '/api';
+    // Get base path from window location or default to /communication-assistant
+    const basePath = window.location.pathname.split('/')[1] === 'communication-assistant' 
+      ? '/communication-assistant' 
+      : '';
+    this.baseURL = `${basePath}/api`;
   }
 
   async request(endpoint, options = {}) {
