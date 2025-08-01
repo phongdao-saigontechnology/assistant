@@ -39,8 +39,8 @@ app.use(express.urlencoded({ extended: true }));
 // Define base path for reverse proxy
 const BASE_PATH = process.env.BASE_PATH || '/communication-assistant';
 
-// Static files with base path - set proper MIME types
-app.use(BASE_PATH, express.static(path.join(__dirname, '../public'), {
+// Static files - serve both with and without base path to handle nginx proxy stripping
+const staticConfig = {
   setHeaders: (res, path) => {
     if (path.endsWith('.css')) {
       res.setHeader('Content-Type', 'text/css');
@@ -48,27 +48,34 @@ app.use(BASE_PATH, express.static(path.join(__dirname, '../public'), {
       res.setHeader('Content-Type', 'application/javascript');
     }
   }
-}));
+};
 
-app.use(`${BASE_PATH}/node_modules`, express.static(path.join(__dirname, '../node_modules'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    } else if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  }
-}));
+// Serve static files with base path (for direct access)
+app.use(BASE_PATH, express.static(path.join(__dirname, '../public'), staticConfig));
+app.use(`${BASE_PATH}/node_modules`, express.static(path.join(__dirname, '../node_modules'), staticConfig));
+
+// Serve static files without base path (for nginx proxy that strips the path)
+app.use('/', express.static(path.join(__dirname, '../public'), staticConfig));
+app.use('/node_modules', express.static(path.join(__dirname, '../node_modules'), staticConfig));
 
 connectDB();
 
-// API routes with base path
+// API routes - serve both with and without base path to handle nginx proxy stripping
+// With base path (for direct access)
 app.use(`${BASE_PATH}/api/auth`, authRoutes);
 app.use(`${BASE_PATH}/api/messages`, authMiddleware, messageRoutes);
 app.use(`${BASE_PATH}/api/templates`, authMiddleware, templateRoutes);
 app.use(`${BASE_PATH}/api/integrations`, authMiddleware, integrationRoutes);
 app.use(`${BASE_PATH}/api/guidelines`, authMiddleware, guidelinesRoutes);
 app.use(`${BASE_PATH}/demo`, demoRoutes);
+
+// Without base path (for nginx proxy that strips the path)
+app.use('/api/auth', authRoutes);
+app.use('/api/messages', authMiddleware, messageRoutes);
+app.use('/api/templates', authMiddleware, templateRoutes);
+app.use('/api/integrations', authMiddleware, integrationRoutes);
+app.use('/api/guidelines', authMiddleware, guidelinesRoutes);
+app.use('/demo', demoRoutes);
 
 // Health check endpoint (both with and without base path for flexibility)
 app.get('/health', (req, res) => {
@@ -91,7 +98,8 @@ app.get(`${BASE_PATH}/favicon.ico`, (req, res) => {
 // Catch-all handler for debugging - should be last
 app.get('*', (req, res) => {
   console.log(`Unhandled route: ${req.method} ${req.path}`);
-  if (req.path.startsWith('/communication-assistant') && !req.path.startsWith('/communication-assistant/api')) {
+  // Since nginx strips the base path, we need to check for root path requests
+  if (req.path === '/' || (!req.path.startsWith('/api') && !req.path.startsWith('/health'))) {
     // Serve index.html for SPA routes
     res.sendFile(path.join(__dirname, '../public/index.html'));
   } else {
