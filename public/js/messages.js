@@ -149,6 +149,9 @@ async function loadMessageComposer() {
                 <button class="btn btn-sm btn-success" onclick="saveMessage()">
                   <i class="fas fa-save"></i> Save
                 </button>
+                <button class="btn btn-sm btn-primary" onclick="showPublishModal()">
+                  <i class="fas fa-paper-plane"></i> Publish
+                </button>
               </div>
             </div>
             <div class="card-body">
@@ -226,7 +229,7 @@ function displayMessagePreview(result) {
       </div>
       
       <h6>Message:</h6>
-      <div class="border p-3 bg-white" style="white-space: pre-wrap;">${result.content}</div>
+      <div class="border p-3 bg-white markdown-content">${renderSafeMarkdown(result.content)}</div>
       
       <div class="mt-3">
         <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('${result.subject}\\n\\n${result.content.replace(/'/g, "\\'")}')">
@@ -491,6 +494,11 @@ function renderMessagesList(messages) {
                   <button class="btn btn-outline-secondary" onclick="editMessage('${message._id}')">
                     <i class="fas fa-edit"></i>
                   </button>
+                  ${message.status === 'draft' ? `
+                  <button class="btn btn-outline-success" onclick="showPublishModal('${message._id}')">
+                    <i class="fas fa-paper-plane"></i>
+                  </button>
+                  ` : ''}
                   <button class="btn btn-outline-danger" onclick="deleteMessage('${message._id}')">
                     <i class="fas fa-trash"></i>
                   </button>
@@ -505,8 +513,121 @@ function renderMessagesList(messages) {
 }
 
 async function viewMessageDetails(messageId) {
-  // Implementation for viewing message details
-  showAlert('Message details view coming soon!', 'info');
+  try {
+    showLoading();
+    const message = await messageAPI.getById(messageId);
+    hideLoading();
+    
+    // Create and show message details modal
+    const modalHtml = `
+      <div class="modal fade" id="messageDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">${message.title}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <strong>Category:</strong> <span class="badge bg-light text-dark">${message.category.replace('_', ' ')}</span>
+                </div>
+                <div class="col-md-6">
+                  <strong>Tone:</strong> <span class="badge ${getToneClass(message.tone)}">${message.tone}</span>
+                </div>
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <strong>Status:</strong> <span class="badge ${getStatusBadgeClass(message.status)}">${message.status}</span>
+                </div>
+                <div class="col-md-6">
+                  <strong>Created:</strong> ${formatDate(message.createdAt)}
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <h6>Subject:</h6>
+                <div class="border p-2 bg-light">
+                  ${message.subject}
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <h6>Message Content:</h6>
+                <div class="border p-3 bg-white markdown-content" style="max-height: 400px; overflow-y: auto;">
+                  ${renderSafeMarkdown(message.content)}
+                </div>
+              </div>
+              
+              ${message.originalPrompt ? `
+                <div class="mb-3">
+                  <h6>Original Prompt:</h6>
+                  <div class="border p-2 bg-light text-muted small">
+                    ${message.originalPrompt}
+                  </div>
+                </div>
+              ` : ''}
+              
+              ${message.distributions && message.distributions.length > 0 ? `
+                <div class="mb-3">
+                  <h6>Distribution History:</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm">
+                      <thead>
+                        <tr>
+                          <th>Platform</th>
+                          <th>Target</th>
+                          <th>Status</th>
+                          <th>Sent At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${message.distributions.map(dist => `
+                          <tr>
+                            <td>${dist.platform}</td>
+                            <td>${dist.target}</td>
+                            <td><span class="badge ${dist.status === 'sent' ? 'bg-success' : 'bg-danger'}">${dist.status}</span></td>
+                            <td>${dist.sentAt ? formatDate(dist.sentAt) : '-'}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-outline-primary" onclick="copyToClipboard('${message.subject}\\n\\n${message.content.replace(/'/g, "\\'")}')">
+                <i class="fas fa-copy"></i> Copy Message
+              </button>
+              ${message.status === 'draft' ? `
+                <button type="button" class="btn btn-success" onclick="showPublishModal('${message._id}')" data-bs-dismiss="modal">
+                  <i class="fas fa-paper-plane"></i> Publish
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('messageDetailsModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
+    // Add modal to DOM and show
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('messageDetailsModal'));
+    modal.show();
+    
+  } catch (error) {
+    hideLoading();
+    showAlert('Failed to load message details: ' + error.message, 'danger');
+  }
 }
 
 async function editMessage(messageId) {
@@ -534,4 +655,278 @@ function filterMessages() {
 function searchMessages() {
   // Implementation for searching messages
   showAlert('Message search coming soon!', 'info');
+}
+
+// Publish functionality
+let currentPublishMessage = null;
+
+async function showPublishModal(messageId = null) {
+  // If messageId is provided, it's from the messages list
+  if (messageId) {
+    try {
+      currentPublishMessage = await messageAPI.getById(messageId);
+    } catch (error) {
+      showAlert('Failed to load message: ' + error.message, 'danger');
+      return;
+    }
+  } else {
+    // Publishing from the composer
+    if (!messagePreview) {
+      showAlert('Please generate a message first', 'warning');
+      return;
+    }
+    
+    // Save the message first if it's not saved
+    try {
+      showLoading();
+      const formData = getFormData();
+      const messageData = {
+        title: messagePreview.subject,
+        subject: messagePreview.subject,
+        content: messagePreview.content,
+        originalPrompt: formData.prompt,
+        tone: formData.tone,
+        category: formData.category,
+        templateUsed: formData.templateId || undefined
+      };
+
+      const savedMessage = await messageAPI.save(messageData);
+      currentPublishMessage = savedMessage.data || savedMessage;
+      hideLoading();
+    } catch (error) {
+      hideLoading();
+      showAlert('Failed to save message before publishing: ' + error.message, 'danger');
+      return;
+    }
+  }
+
+  // Create and show the publish modal
+  const modalHtml = `
+    <div class="modal fade" id="publishModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Publish Message</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row mb-3">
+              <div class="col-12">
+                <h6>Message Preview:</h6>
+                <div class="border p-3 bg-light">
+                  <strong>Subject:</strong> ${currentPublishMessage.subject}<br>
+                  <strong>Content:</strong> 
+                  <div class="mt-2 markdown-content" style="max-height: 200px; overflow-y: auto;">
+                    ${renderSafeMarkdown(currentPublishMessage.content)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-header">
+                    <h6 class="mb-0">
+                      <input type="checkbox" id="publishWebsite" class="form-check-input me-2" checked>
+                      Demo Website
+                    </h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-floating mb-3">
+                      <input type="text" class="form-control" id="companyName" placeholder="Company Name">
+                      <label for="companyName">Company Name (optional)</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                      <input type="url" class="form-control" id="companyLogo" placeholder="Logo URL">
+                      <label for="companyLogo">Company Logo URL (optional)</label>
+                    </div>
+                    <div class="form-floating">
+                      <input type="url" class="form-control" id="companyWebsite" placeholder="Website URL">
+                      <label for="companyWebsite">Company Website (optional)</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-header">
+                    <h6 class="mb-0">
+                      <input type="checkbox" id="publishTeams" class="form-check-input me-2">
+                      Microsoft Teams
+                    </h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-floating mb-3">
+                      <input type="text" class="form-control" id="teamsWebhook" placeholder="Teams Webhook URL">
+                      <label for="teamsWebhook">Webhook URL</label>
+                    </div>
+                    <p class="text-muted small">
+                      <i class="fas fa-info-circle"></i> 
+                      Get webhook URL from your Teams channel settings
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-3">
+              <h6>Publishing Options:</h6>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="publishTiming" id="publishNow" value="now" checked>
+                <label class="form-check-label" for="publishNow">
+                  Publish Now
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="publishTiming" id="schedulePublish" value="schedule">
+                <label class="form-check-label" for="schedulePublish">
+                  Schedule for Later
+                </label>
+              </div>
+              <div id="scheduleOptions" class="mt-2" style="display: none;">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="date" class="form-control" id="scheduleDate">
+                      <label for="scheduleDate">Date</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-floating">
+                      <input type="time" class="form-control" id="scheduleTime">
+                      <label for="scheduleTime">Time</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="publishMessage()">
+              <i class="fas fa-paper-plane"></i> Publish
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove existing modal if any
+  const existingModal = document.getElementById('publishModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Add modal to DOM
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Add event listeners
+  document.getElementById('schedulePublish').addEventListener('change', function() {
+    document.getElementById('scheduleOptions').style.display = this.checked ? 'block' : 'none';
+  });
+  
+  document.getElementById('publishNow').addEventListener('change', function() {
+    document.getElementById('scheduleOptions').style.display = this.checked ? 'none' : 'block';
+  });
+
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('publishModal'));
+  modal.show();
+}
+
+async function publishMessage() {
+  if (!currentPublishMessage) {
+    showAlert('No message to publish', 'warning');
+    return;
+  }
+
+  const publishWebsite = document.getElementById('publishWebsite').checked;
+  const publishTeams = document.getElementById('publishTeams').checked;
+  const publishTiming = document.querySelector('input[name="publishTiming"]:checked').value;
+
+  if (!publishWebsite && !publishTeams) {
+    showAlert('Please select at least one platform to publish to', 'warning');
+    return;
+  }
+
+  const distributions = [];
+
+  // Website distribution
+  if (publishWebsite) {
+    const companyInfo = {
+      name: document.getElementById('companyName').value,
+      logo: document.getElementById('companyLogo').value,
+      website: document.getElementById('companyWebsite').value
+    };
+    
+    distributions.push({
+      platform: 'website',
+      config: { companyInfo }
+    });
+  }
+
+  // Teams distribution
+  if (publishTeams) {
+    const webhook = document.getElementById('teamsWebhook').value;
+    if (!webhook) {
+      showAlert('Please enter Teams webhook URL', 'warning');
+      return;
+    }
+    
+    distributions.push({
+      platform: 'teams',
+      config: { webhook }
+    });
+  }
+
+  try {
+    showLoading();
+    
+    if (publishTiming === 'schedule') {
+      const scheduleDate = document.getElementById('scheduleDate').value;
+      const scheduleTime = document.getElementById('scheduleTime').value;
+      
+      if (!scheduleDate || !scheduleTime) {
+        showAlert('Please select both date and time for scheduling', 'warning');
+        hideLoading();
+        return;
+      }
+      
+      const scheduledFor = new Date(`${scheduleDate}T${scheduleTime}`);
+      
+      await integrationAPI.schedule({
+        messageId: currentPublishMessage._id,
+        scheduledFor: scheduledFor.toISOString(),
+        distributions
+      });
+      
+      showAlert('Message scheduled successfully!', 'success');
+    } else {
+      const result = await integrationAPI.send({
+        messageId: currentPublishMessage._id,
+        distributions
+      });
+      
+      showAlert('Message published successfully!', 'success');
+      console.log('Publish results:', result);
+    }
+    
+    hideLoading();
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('publishModal'));
+    modal.hide();
+    
+    // Refresh messages list if we're on that page
+    if (document.querySelector('.table')) {
+      loadMessages();
+    }
+    
+  } catch (error) {
+    hideLoading();
+    showAlert('Failed to publish message: ' + error.message, 'danger');
+  }
 }

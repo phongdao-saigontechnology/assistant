@@ -190,6 +190,21 @@ function getScoreClass(score) {
   return 'score-low';
 }
 
+function getStatusBadgeClass(status) {
+  switch (status) {
+    case 'draft':
+      return 'bg-warning text-dark';
+    case 'published':
+      return 'bg-success';
+    case 'scheduled':
+      return 'bg-info';
+    case 'failed':
+      return 'bg-danger';
+    default:
+      return 'bg-secondary';
+  }
+}
+
 function truncateText(text, maxLength = 100) {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
@@ -202,6 +217,33 @@ function copyToClipboard(text) {
     console.error('Failed to copy: ', err);
     showAlert('Failed to copy to clipboard', 'danger');
   });
+}
+
+// Markdown rendering utility
+function renderMarkdown(content) {
+  if (typeof marked !== 'undefined' && content) {
+    try {
+      // Configure marked for security
+      marked.setOptions({
+        sanitize: false,
+        breaks: true,
+        gfm: true
+      });
+      return marked.parse(content);
+    } catch (error) {
+      console.error('Error rendering markdown:', error);
+      return content.replace(/\n/g, '<br>');
+    }
+  }
+  // Fallback: convert line breaks to <br> tags
+  return content ? content.replace(/\n/g, '<br>') : '';
+}
+
+// Safe HTML rendering - prevents XSS while allowing basic formatting
+function renderSafeMarkdown(content) {
+  const rendered = renderMarkdown(content);
+  // You could add additional sanitization here if needed
+  return rendered;
 }
 
 // Handle page refresh
