@@ -36,7 +36,10 @@ app.use(helmet({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-// Define base path for reverse proxy
+// Define base path for reverse proxy - check X-Forwarded-Prefix header first
+const getBasePath = (req) => {
+  return req.headers['x-forwarded-prefix'] || process.env.BASE_PATH || '/communication-assistant';
+};
 const BASE_PATH = process.env.BASE_PATH || '/communication-assistant';
 
 // Static files - serve both with and without base path to handle nginx proxy stripping
@@ -84,6 +87,17 @@ app.get('/health', (req, res) => {
 
 app.get(`${BASE_PATH}/health`, (req, res) => {
   res.json({ status: 'OK', service: 'Internal Communications Assistant' });
+});
+
+// Base path endpoint to help frontend determine correct paths
+app.get('/api/config/base-path', (req, res) => {
+  const basePath = getBasePath(req);
+  res.json({ basePath: basePath === '/communication-assistant' ? '' : basePath });
+});
+
+app.get(`${BASE_PATH}/api/config/base-path`, (req, res) => {
+  const basePath = getBasePath(req);
+  res.json({ basePath: basePath === '/communication-assistant' ? '' : basePath });
 });
 
 // Handle favicon requests

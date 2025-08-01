@@ -43,7 +43,7 @@ async function loadIntegrations() {
               <div class="d-flex justify-content-between align-items-center">
                 <div>
                   <strong>Demo Website:</strong> 
-                  <a href="/demo" target="_blank" class="text-decoration-none">
+                  <a href="${api.getDemoURL()}" target="_blank" class="text-decoration-none">
                     <i class="fas fa-external-link-alt me-1"></i>
                     View Demo Site
                   </a>
