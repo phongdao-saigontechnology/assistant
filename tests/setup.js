@@ -1,24 +1,20 @@
 import mongoose from 'mongoose';
 
-// Mock OpenAI for tests
-jest.mock('openai', () => {
+// Mock Google Gemini for tests
+jest.mock('@google/generative-ai', () => {
   return {
     __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: jest.fn().mockResolvedValue({
-            choices: [{
-              message: {
-                content: 'SUBJECT: Test Generated Subject\nBODY: This is a test generated message body with professional tone and clear communication.'
-              }
-            }],
-            usage: {
-              total_tokens: 150
+    GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+      getGenerativeModel: jest.fn().mockReturnValue({
+        generateContent: jest.fn().mockResolvedValue({
+          response: {
+            text: jest.fn().mockReturnValue('SUBJECT: Test Generated Subject\nBODY: This is a test generated message body with professional tone and clear communication.'),
+            usageMetadata: {
+              totalTokenCount: 150
             }
-          })
-        }
-      }
+          }
+        })
+      })
     }))
   };
 });

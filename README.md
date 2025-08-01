@@ -25,8 +25,8 @@ The Internal Communications Assistant helps business leaders, HR teams, and comm
 
 - **Backend**: Node.js, Express.js, MongoDB
 - **Frontend**: Vanilla JavaScript, Bootstrap 5
-- **AI Integration**: OpenAI GPT-4
-- **Integrations**: Slack Web API, Microsoft Graph API, Nodemailer
+- **AI Integration**: Google Gemini 1.5 Pro
+- **Integrations**: Microsoft Graph API
 - **Authentication**: JWT tokens
 - **Testing**: Jest, Supertest
 
@@ -36,7 +36,7 @@ The Internal Communications Assistant helps business leaders, HR teams, and comm
 
 - Node.js (v18 or higher)
 - MongoDB (v5 or higher)
-- OpenAI API key
+- Google Gemini API key
 
 ### Installation
 
@@ -76,13 +76,9 @@ npm start
 | `PORT` | Server port (default: 3000) | No |
 | `MONGODB_URI` | MongoDB connection string | Yes |
 | `JWT_SECRET` | JWT signing secret | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for AI features | Yes |
-| `SLACK_BOT_TOKEN` | Slack bot token | No |
+| `GEMINI_API_KEY` | Google Gemini API key for AI features | Yes |
 | `AZURE_CLIENT_ID` | Azure app client ID for Teams | No |
 | `AZURE_CLIENT_SECRET` | Azure app secret for Teams | No |
-| `EMAIL_HOST` | SMTP server host | No |
-| `EMAIL_USER` | SMTP username | No |
-| `EMAIL_PASS` | SMTP password | No |
 
 ## API Documentation
 
@@ -233,9 +229,8 @@ The system includes 5 default template categories:
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production MongoDB instance
 - [ ] Set strong JWT secret
-- [ ] Configure OpenAI API key
-- [ ] Set up integration credentials
-- [ ] Configure SMTP for email
+- [ ] Configure Google Gemini API key
+- [ ] Set up Teams integration credentials
 - [ ] Set up SSL/TLS certificate
 - [ ] Configure reverse proxy (nginx)
 - [ ] Set up monitoring and logging
@@ -250,7 +245,7 @@ docker build -t communications-assistant .
 # Run container
 docker run -p 3000:3000 \
   -e MONGODB_URI=mongodb://mongo:27017/communications-assistant \
-  -e OPENAI_API_KEY=your_key_here \
+  -e GEMINI_API_KEY=your_key_here \
   communications-assistant
 ```
 

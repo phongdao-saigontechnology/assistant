@@ -199,9 +199,6 @@ const integrationAPI = {
     return api.post('/integrations/test-connection', data);
   },
 
-  async getSlackChannels(token) {
-    return api.get('/integrations/slack/channels', { token });
-  },
 
   async getUserIntegrations() {
     return api.get('/integrations/user-integrations');

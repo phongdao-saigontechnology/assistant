@@ -10,14 +10,14 @@ const sendMessageSchema = Joi.object({
   messageId: Joi.string().required(),
   distributions: Joi.array().items(
     Joi.object({
-      platform: Joi.string().valid('slack', 'teams', 'email').required(),
+      platform: Joi.string().valid('teams').required(),
       config: Joi.object().required()
     })
   ).required()
 });
 
 const testConnectionSchema = Joi.object({
-  platform: Joi.string().valid('slack', 'teams', 'email').required(),
+  platform: Joi.string().valid('teams').required(),
   config: Joi.object().required()
 });
 
@@ -100,14 +100,6 @@ router.post('/test-connection', async (req, res, next) => {
     let result;
 
     switch (platform) {
-      case 'slack':
-        result = await integrationService.testSlackConnection(config.token);
-        break;
-        
-      case 'email':
-        result = await integrationService.testEmailConnection();
-        break;
-        
       case 'teams':
         result = { success: false, error: 'Teams connection test not implemented yet' };
         break;
@@ -122,20 +114,6 @@ router.post('/test-connection', async (req, res, next) => {
   }
 });
 
-router.get('/slack/channels', async (req, res, next) => {
-  try {
-    const { token } = req.query;
-    
-    if (!token) {
-      return res.status(400).json({ error: 'Slack token is required' });
-    }
-
-    const result = await integrationService.getSlackChannels(token);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
 
 router.get('/user-integrations', async (req, res, next) => {
   try {
@@ -149,19 +127,10 @@ router.get('/user-integrations', async (req, res, next) => {
 router.put('/user-integrations', async (req, res, next) => {
   try {
     const integrationSchema = Joi.object({
-      slack: Joi.object({
-        enabled: Joi.boolean().default(false),
-        workspaceId: Joi.string().allow(''),
-        channelId: Joi.string().allow('')
-      }).default({}),
       teams: Joi.object({
         enabled: Joi.boolean().default(false),
         tenantId: Joi.string().allow(''),
         teamId: Joi.string().allow('')
-      }).default({}),
-      email: Joi.object({
-        enabled: Joi.boolean().default(true),
-        distributionLists: Joi.array().items(Joi.string()).default([])
       }).default({})
     });
 
@@ -192,7 +161,7 @@ router.post('/schedule', async (req, res, next) => {
       scheduledFor: Joi.date().min('now').required(),
       distributions: Joi.array().items(
         Joi.object({
-          platform: Joi.string().valid('slack', 'teams', 'email').required(),
+          platform: Joi.string().valid('teams').required(),
           config: Joi.object().required()
         })
       ).required()

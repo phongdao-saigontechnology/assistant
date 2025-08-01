@@ -1,9 +1,8 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import Guidelines from '../models/Guidelines.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
 class AIService {
   async generateMessage(prompt, options = {}) {
@@ -20,23 +19,24 @@ class AIService {
     const userPrompt = this.buildUserPrompt(prompt, templateContent, options);
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1500
+      const fullPrompt = `${systemPrompt}\n\nUser Request: ${userPrompt}`;
+      
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1500,
+        },
       });
 
-      const generatedContent = completion.choices[0].message.content;
+      const response = await result.response;
+      const generatedContent = response.text();
       const analysis = await this.analyzeContent(generatedContent, guidelines);
 
       return {
         content: generatedContent,
         analysis,
-        tokensUsed: completion.usage.total_tokens
+        tokensUsed: response.usageMetadata?.totalTokenCount || 0
       };
     } catch (error) {
       console.error('AI generation error:', error);
@@ -126,14 +126,16 @@ Respond in JSON format:
   "suggestions": ["suggestion1", "suggestion2"]
 }`;
 
-      const analysis = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 500
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 500,
+        },
       });
 
-      return JSON.parse(analysis.choices[0].message.content);
+      const response = await result.response;
+      return JSON.parse(response.text());
     } catch (error) {
       console.error('Analysis error:', error);
       return {
@@ -148,10 +150,10 @@ Respond in JSON format:
   async getActiveGuidelines(company) {
     if (!company) return null;
     
-    return await Guidelines.findOne({ 
-      company, 
-      isActive: true 
-    }).sort({ createdAt: -1 });
+    return Guidelines.findOne({
+      company,
+      isActive: true
+    }).sort({createdAt: -1});
   }
 
   async improveMessage(originalContent, feedback, guidelines) {
@@ -166,14 +168,16 @@ ${guidelines ? `Company Guidelines: ${guidelines.content}` : ''}
 Please provide an improved version maintaining the same structure (SUBJECT: / BODY:)`;
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: improvementPrompt }],
-        temperature: 0.6,
-        max_tokens: 1500
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: improvementPrompt }] }],
+        generationConfig: {
+          temperature: 0.6,
+          maxOutputTokens: 1500,
+        },
       });
 
-      return completion.choices[0].message.content;
+      const response = await result.response;
+      return response.text();
     } catch (error) {
       console.error('Improvement error:', error);
       throw new Error('Failed to improve content');
