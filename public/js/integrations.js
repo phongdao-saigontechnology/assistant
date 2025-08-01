@@ -26,6 +26,38 @@ async function loadIntegrations() {
           <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h5 class="mb-0">
+                <i class="fas fa-globe text-success"></i> Demo Website Publication
+              </h5>
+              <span class="integration-status integration-connected">
+                Always Available
+              </span>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Perfect for POC Demos!</strong><br>
+                Publish AI-generated communications to a professional demo website. 
+                Great for showcasing capabilities without requiring external integrations.
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>Demo Website:</strong> 
+                  <a href="/demo" target="_blank" class="text-decoration-none">
+                    <i class="fas fa-external-link-alt me-1"></i>
+                    View Demo Site
+                  </a>
+                </div>
+                <button class="btn btn-sm btn-outline-success" onclick="testWebsiteConnection()">
+                  <i class="fas fa-check"></i> Always Ready
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
                 <i class="fab fa-microsoft text-primary"></i> Microsoft Teams Integration
               </h5>
               <span class="integration-status ${userIntegrations.teams?.enabled ? 'integration-connected' : 'integration-disconnected'}">
@@ -98,6 +130,10 @@ async function loadIntegrations() {
               <h5 class="mb-0">Integration Status</h5>
             </div>
             <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>Demo Website</span>
+                <span class="badge bg-success">Always Ready</span>
+              </div>
               <div class="d-flex justify-content-between align-items-center">
                 <span>Teams</span>
                 <span id="teamsStatus" class="badge ${userIntegrations.teams?.enabled ? 'bg-success' : 'bg-secondary'}">
@@ -218,16 +254,40 @@ async function testTeamsConnection() {
 }
 
 
+async function testWebsiteConnection() {
+  try {
+    showLoading();
+    const result = await integrationAPI.testConnection({
+      platform: 'website',
+      config: {}
+    });
+
+    hideLoading();
+    
+    if (result.success) {
+      showAlert('Website publishing is ready!', 'success');
+    } else {
+      showAlert(`Website test failed: ${result.error}`, 'danger');
+    }
+  } catch (error) {
+    hideLoading();
+    showAlert('Failed to test website connection: ' + error.message, 'danger');
+  }
+}
+
 async function testAllConnections() {  
+  // Test website (always available)
+  await testWebsiteConnection();
+  
   if (document.getElementById('teamsEnabled').checked) {
     try {
       await testTeamsConnection();
-      showAlert('Teams connection test completed', 'info');
+      showAlert('All connection tests completed', 'info');
     } catch (error) {
       showAlert('Teams connection test failed', 'warning');
     }
   } else {
-    showAlert('No integrations enabled to test', 'warning');
+    showAlert('Website ready. Teams integration not enabled.', 'info');
   }
 }
 
@@ -299,6 +359,14 @@ async function showDistributionModal(messageId) {
                         </label>
                       </div>
                     ` : ''}
+                    
+                    <div class="form-check mb-3">
+                      <input class="form-check-input" type="checkbox" id="distributeWebsite" checked>
+                      <label class="form-check-label" for="distributeWebsite">
+                        <i class="fas fa-globe text-success"></i> Publish to Demo Website
+                        <small class="d-block text-muted">Great for showcasing AI communications in POC demos</small>
+                      </label>
+                    </div>
 
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="scheduleDelivery">
@@ -356,6 +424,18 @@ async function distributeMessage(messageId) {
   try {
     const distributions = [];
 
+    // Check Website
+    if (document.getElementById('distributeWebsite')?.checked) {
+      distributions.push({
+        platform: 'website',
+        config: {
+          companyInfo: {
+            name: 'Demo Company'
+          }
+        }
+      });
+    }
+
     // Check Teams
     if (document.getElementById('distributeTeams')?.checked) {
       distributions.push({
@@ -397,11 +477,20 @@ async function distributeMessage(messageId) {
       
       const successCount = result.results.filter(r => r.status === 'sent').length;
       const failCount = result.results.filter(r => r.status === 'failed').length;
+      const websiteResults = result.results.filter(r => r.platform === 'website' && r.status === 'sent');
       
       if (successCount > 0 && failCount === 0) {
-        showAlert(`Message sent successfully to ${successCount} platform(s)!`, 'success');
+        let message = `Message sent successfully to ${successCount} platform(s)!`;
+        if (websiteResults.length > 0) {
+          message += ` <a href="${websiteResults[0].url}" target="_blank" class="text-decoration-none"><i class="fas fa-external-link-alt"></i> View on Demo Site</a>`;
+        }
+        showAlert(message, 'success');
       } else if (successCount > 0) {
-        showAlert(`Message sent to ${successCount} platform(s), ${failCount} failed`, 'warning');
+        let message = `Message sent to ${successCount} platform(s), ${failCount} failed`;
+        if (websiteResults.length > 0) {
+          message += ` <a href="${websiteResults[0].url}" target="_blank" class="text-decoration-none"><i class="fas fa-external-link-alt"></i> View on Demo Site</a>`;
+        }
+        showAlert(message, 'warning');
       } else {
         showAlert('Failed to send message to all platforms', 'danger');
       }

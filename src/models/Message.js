@@ -47,7 +47,7 @@ const messageSchema = new mongoose.Schema({
   distributions: [{
     platform: {
       type: String,
-      enum: ['slack', 'teams', 'email'],
+      enum: ['slack', 'teams', 'email', 'website'],
       required: true
     },
     target: {

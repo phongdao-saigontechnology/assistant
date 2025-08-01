@@ -66,7 +66,47 @@ npm run dev
 npm start
 ```
 
-5. Open your browser to `http://localhost:3000`
+5. Seed the database with default templates and guidelines:
+```bash
+# Seed both templates and guidelines
+npm run seed
+
+# Or seed individually
+npm run seed:templates
+npm run seed:guidelines
+```
+
+6. Open your browser to `http://localhost:3000`
+
+## Database Seeding
+
+The application includes comprehensive seed data to get you started quickly:
+
+### Default Templates
+- **Policy Update**: Template for communicating policy changes
+- **Leadership Announcement**: Template for leadership communications  
+- **Event Invitation**: Template for company events and meetings
+- **General Update**: Template for regular company updates
+- **Urgent Notice**: Template for time-sensitive announcements
+
+### Default Guidelines
+- **Corporate Communication Standards**: Professional communication guidelines
+- **Crisis Communication Guidelines**: Guidelines for emergency situations
+- **Employee Recognition Guidelines**: Best practices for recognition messages
+
+### Seeding Commands
+```bash
+# Seed all data (templates + guidelines)
+npm run seed
+
+# Seed only templates
+npm run seed:templates  
+
+# Seed only guidelines
+npm run seed:guidelines
+```
+
+**Note**: Seeding is idempotent - running it multiple times won't create duplicates.
 
 ## Environment Variables
 
@@ -238,14 +278,54 @@ The system includes 5 default template categories:
 
 ### Docker Deployment
 
+#### Using Docker Compose (Recommended)
+
+1. Create a `.env` file with your configuration:
+```bash
+# Required
+JWT_SECRET=your-super-secret-jwt-key
+GEMINI_API_KEY=your-gemini-api-key
+
+# Optional
+MONGO_ROOT_PASSWORD=your-mongo-password
+AZURE_CLIENT_ID=your-azure-client-id
+AZURE_CLIENT_SECRET=your-azure-client-secret
+```
+
+2. Start the services:
+```bash
+# Start all services (includes automatic database seeding)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+The Docker Compose setup includes:
+- **MongoDB**: Database with health checks
+- **Seed Service**: Automatically seeds templates and guidelines
+- **App Service**: Main application (starts after seeding completes)
+
+#### Manual Docker Build
+
 ```bash
 # Build image
 docker build -t communications-assistant .
 
-# Run container
+# Run with manual seeding
+docker run --rm \
+  -e MONGODB_URI=mongodb://mongo:27017/communications-assistant \
+  -e JWT_SECRET=your_secret \
+  communications-assistant npm run seed
+
+# Run application
 docker run -p 3000:3000 \
   -e MONGODB_URI=mongodb://mongo:27017/communications-assistant \
   -e GEMINI_API_KEY=your_key_here \
+  -e JWT_SECRET=your_secret \
   communications-assistant
 ```
 

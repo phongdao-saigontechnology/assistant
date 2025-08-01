@@ -1,8 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Guidelines from '../models/Guidelines.js';
 
+console.log('GEMINI_API_KEY loaded:', process.env.GEMINI_API_KEY ? 'Yes' : 'No');
+console.log('API key length:', process.env.GEMINI_API_KEY?.length || 0);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-2.0-flash-exp",
+  systemInstruction: "You are an expert internal communications assistant. Your role is to help create clear, professional, and on-brand internal messages for businesses."
+});
 
 class AIService {
   async generateMessage(prompt, options = {}) {
@@ -29,7 +34,7 @@ class AIService {
         },
       });
 
-      const response = await result.response;
+      const response = result.response;
       const generatedContent = response.text();
       const analysis = await this.analyzeContent(generatedContent, guidelines);
 
@@ -40,6 +45,13 @@ class AIService {
       };
     } catch (error) {
       console.error('AI generation error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        errorDetails: error.errorDetails
+      });
+      console.error('API Key being used:', process.env.GEMINI_API_KEY ? 'Present (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'Missing');
       throw new Error('Failed to generate content');
     }
   }
@@ -126,16 +138,18 @@ Respond in JSON format:
   "suggestions": ["suggestion1", "suggestion2"]
 }`;
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 500,
-        },
+      const result = await model.generateContent(analysisPrompt, {
+        temperature: 0.3,
+        maxOutputTokens: 500,
       });
 
-      const response = await result.response;
-      return JSON.parse(response.text());
+      const response = result.response;
+      const responseText = response.text();
+      
+      // Clean up markdown formatting if present
+      const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      return JSON.parse(cleanedText);
     } catch (error) {
       console.error('Analysis error:', error);
       return {
@@ -168,15 +182,12 @@ ${guidelines ? `Company Guidelines: ${guidelines.content}` : ''}
 Please provide an improved version maintaining the same structure (SUBJECT: / BODY:)`;
 
     try {
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: improvementPrompt }] }],
-        generationConfig: {
-          temperature: 0.6,
-          maxOutputTokens: 1500,
-        },
+      const result = await model.generateContent(improvementPrompt, {
+        temperature: 0.6,
+        maxOutputTokens: 1500,
       });
 
-      const response = await result.response;
+      const response = result.response;
       return response.text();
     } catch (error) {
       console.error('Improvement error:', error);

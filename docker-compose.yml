@@ -6,7 +6,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MONGODB_URI=mongodb://mongo:27017/communications-assistant
+      - MONGODB_URI=mongodb://admin:defaultpassword@mongo:27017/communications-assistant?authSource=admin
       - JWT_SECRET=${JWT_SECRET}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
@@ -14,9 +14,24 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     volumes:
       - ./uploads:/app/uploads
     restart: unless-stopped
+    networks:
+      - app-network
+
+  seed:
+    build: .
+    environment:
+      - MONGODB_URI=mongodb://admin:defaultpassword@mongo:27017/communications-assistant?authSource=admin
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: npm run seed
+    restart: "no"
     networks:
       - app-network
 

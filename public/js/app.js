@@ -87,6 +87,9 @@ class App {
   }
 }
 
+// Initialize the application first
+const app = new App();
+
 // Navigation functions
 function showDashboard() {
   if (!auth.isAuthenticated()) {
@@ -200,9 +203,6 @@ function copyToClipboard(text) {
     showAlert('Failed to copy to clipboard', 'danger');
   });
 }
-
-// Initialize the application
-const app = new App();
 
 // Handle page refresh
 window.addEventListener('beforeunload', () => {

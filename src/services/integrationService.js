@@ -1,4 +1,5 @@
 import { Client } from '@microsoft/microsoft-graph-client';
+import websiteService from './websiteService.js';
 
 class IntegrationService {
   constructor() {
@@ -87,6 +88,33 @@ class IntegrationService {
     };
   }
 
+  async sendToWebsite(options) {
+    const { message, companyInfo, userEmail } = options;
+    
+    try {
+      const result = await websiteService.publishToWebsite(message, companyInfo);
+      
+      if (result.success) {
+        return {
+          success: true,
+          url: result.url,
+          publishedAt: result.publishedAt
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error
+        };
+      }
+    } catch (error) {
+      console.error('Website publication error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
   async sendMessage(messageData) {
     const { platform, config, subject, content, userEmail, userName } = messageData;
     
@@ -100,6 +128,13 @@ class IntegrationService {
           channelId: config.channelId,
           subject,
           content,
+          userEmail
+        });
+
+      case 'website':
+        return await this.sendToWebsite({
+          message: config.message,
+          companyInfo: config.companyInfo || {},
           userEmail
         });
 

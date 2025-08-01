@@ -10,14 +10,14 @@ const sendMessageSchema = Joi.object({
   messageId: Joi.string().required(),
   distributions: Joi.array().items(
     Joi.object({
-      platform: Joi.string().valid('teams').required(),
+      platform: Joi.string().valid('teams', 'website').required(),
       config: Joi.object().required()
     })
   ).required()
 });
 
 const testConnectionSchema = Joi.object({
-  platform: Joi.string().valid('teams').required(),
+  platform: Joi.string().valid('teams', 'website').required(),
   config: Joi.object().required()
 });
 
@@ -43,22 +43,37 @@ router.post('/send', async (req, res, next) => {
     
     for (const distribution of distributions) {
       try {
-        const result = await integrationService.sendMessage({
-          platform: distribution.platform,
-          config: distribution.config,
-          subject: message.subject,
-          content: message.content,
-          userEmail: req.user.email,
-          userName: req.user.name
-        });
+        let result;
+        if (distribution.platform === 'website') {
+          result = await integrationService.sendMessage({
+            platform: distribution.platform,
+            config: {
+              message: message,
+              companyInfo: distribution.config.companyInfo || {}
+            },
+            userEmail: req.user.email,
+            userName: req.user.name
+          });
+        } else {
+          result = await integrationService.sendMessage({
+            platform: distribution.platform,
+            config: distribution.config,
+            subject: message.subject,
+            content: message.content,
+            userEmail: req.user.email,
+            userName: req.user.name
+          });
+        }
 
         const distributionResult = {
           platform: distribution.platform,
-          target: distribution.config.channel || distribution.config.to || 'Unknown',
+          target: distribution.platform === 'website' ? 'Demo Website' : 
+                 (distribution.config.channel || distribution.config.to || 'Unknown'),
           status: result.success ? 'sent' : 'failed',
-          messageId: result.messageId,
+          messageId: result.messageId || result.url,
           error: result.error,
-          sentAt: result.success ? new Date() : null
+          sentAt: result.success ? new Date() : null,
+          url: result.url
         };
 
         message.distributions.push(distributionResult);
@@ -102,6 +117,10 @@ router.post('/test-connection', async (req, res, next) => {
     switch (platform) {
       case 'teams':
         result = { success: false, error: 'Teams connection test not implemented yet' };
+        break;
+        
+      case 'website':
+        result = { success: true, message: 'Website publishing is always available' };
         break;
         
       default:
@@ -161,7 +180,7 @@ router.post('/schedule', async (req, res, next) => {
       scheduledFor: Joi.date().min('now').required(),
       distributions: Joi.array().items(
         Joi.object({
-          platform: Joi.string().valid('teams').required(),
+          platform: Joi.string().valid('teams', 'website').required(),
           config: Joi.object().required()
         })
       ).required()

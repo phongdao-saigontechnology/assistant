@@ -169,11 +169,19 @@ function logout() {
 
 // Utility functions
 function showModal(modalId) {
+  if (typeof bootstrap === 'undefined') {
+    console.error('Bootstrap is not loaded');
+    return;
+  }
   const modal = new bootstrap.Modal(document.getElementById(modalId));
   modal.show();
 }
 
 function hideModal(modalId) {
+  if (typeof bootstrap === 'undefined') {
+    console.error('Bootstrap is not loaded');
+    return;
+  }
   const modal = bootstrap.Modal.getInstance(document.getElementById(modalId));
   if (modal) {
     modal.hide();
